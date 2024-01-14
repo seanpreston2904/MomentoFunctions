@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 using Azure.Storage.Blobs;
 using QRCoder;
 using Azure.Storage;
+using Microsoft.VisualBasic;
+using Azure;
+using System.Text.Json;
 
 namespace Momento.CreateQrCode
 {
@@ -17,14 +20,7 @@ namespace Momento.CreateQrCode
         // Storage Connection Data
         private static readonly String _qrStorageAccountName = Environment.GetEnvironmentVariable("QrStorageAccountName")!;
         private static readonly String _qrStorageAccessKey = Environment.GetEnvironmentVariable("QrStorageAccessKey")!;
-
-        private static readonly StorageSharedKeyCredential _qrCodeStorageKeyCredential =
-            new StorageSharedKeyCredential(_qrStorageAccountName, _qrStorageAccessKey);
-        
         private static readonly string _blobUri = "https://" + _qrStorageAccountName + ".blob.core.windows.net";
-
-        private static readonly BlobServiceClient _blobServiceClient = new BlobServiceClient(new Uri(_blobUri), _qrCodeStorageKeyCredential);
-        private static readonly BlobContainerClient _blobContainerClient = _blobServiceClient.GetBlobContainerClient("qrcodes");
 
 
         public CreateQrCode(ILoggerFactory loggerFactory)
@@ -38,20 +34,52 @@ namespace Momento.CreateQrCode
 
             _logger.LogInformation("C# HTTP trigger function processed a request.");
 
-            // Generate QR Code
-            QRCodeData qrCodeData = _qrCodeGenerator.CreateQrCode("https://www.google.com", QRCodeGenerator.ECCLevel.Q);
-            PngByteQRCode qrCodePng = new PngByteQRCode(qrCodeData);
+            HttpResponseData response;
+            string uploadUrl;
 
-            // Generate file from QR Code and upload to blob storage
-            string filename = Guid.NewGuid().ToString() + ".png";
-            _blobContainerClient.UploadBlob(filename, BinaryData.FromBytes(qrCodePng.GetGraphic(512)));
+            try{
 
-            var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+                // Create storage credential
+                StorageSharedKeyCredential qrCodeStorageKeyCredential =
+                    new StorageSharedKeyCredential(_qrStorageAccountName, _qrStorageAccessKey);
 
-            response.WriteString("QR Code Uploaded");
+                // Create blob service client and blob container clients
+                BlobServiceClient blobServiceClient = 
+                    new BlobServiceClient(new Uri(_blobUri), qrCodeStorageKeyCredential);
+
+                BlobContainerClient blobContainerClient = 
+                    blobServiceClient.GetBlobContainerClient("qrcodes");
+
+                // Generate QR Code and upload to blob storage with unique GUID
+                QRCodeData qrCodeData = _qrCodeGenerator.CreateQrCode("https://www.google.com", QRCodeGenerator.ECCLevel.Q);
+                PngByteQRCode qrCodePng = new PngByteQRCode(qrCodeData);
+
+                string filename = Guid.NewGuid().ToString() + ".png";
+                var uploadResponse = blobContainerClient.UploadBlob(filename, BinaryData.FromBytes(qrCodePng.GetGraphic(512)));
+
+                uploadUrl = $"{blobContainerClient.Uri}/{filename}";
+
+            } catch (Exception ex){
+
+                // On exception log error and return 500 status code
+                _logger.LogError(ex.Message);
+
+                response = req.CreateResponse(HttpStatusCode.InternalServerError);
+                response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+                response.WriteString("An internal server error occurred.");
+
+                return response;
+
+            }
+
+            // On success return JSON response containing QR code URL
+            var responseContent = new {url = uploadUrl};
+
+            response = req.CreateResponse(HttpStatusCode.OK);
+            response.WriteAsJsonAsync(responseContent).GetAwaiter().GetResult();
 
             return response;
+
         }
 
     }
