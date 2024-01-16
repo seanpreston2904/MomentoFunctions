@@ -32,12 +32,15 @@ namespace Momento.CreateQrCode
         public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
 
-            _logger.LogInformation("C# HTTP trigger function processed a request.");
+            _logger.LogInformation("CreateQrCode request received.");
 
             HttpResponseData response;
             string uploadUrl;
 
             try{
+
+                // Generate a unique GUID for QR Code and associated Bucket
+                string id = Guid.NewGuid().ToString();
 
                 // Create storage credential
                 StorageSharedKeyCredential qrCodeStorageKeyCredential =
@@ -54,10 +57,9 @@ namespace Momento.CreateQrCode
                 QRCodeData qrCodeData = _qrCodeGenerator.CreateQrCode("https://www.google.com", QRCodeGenerator.ECCLevel.Q);
                 PngByteQRCode qrCodePng = new PngByteQRCode(qrCodeData);
 
-                string filename = Guid.NewGuid().ToString() + ".png";
-                var uploadResponse = blobContainerClient.UploadBlob(filename, BinaryData.FromBytes(qrCodePng.GetGraphic(512)));
+                var uploadResponse = blobContainerClient.UploadBlob($"{id}.png", BinaryData.FromBytes(qrCodePng.GetGraphic(512)));
 
-                uploadUrl = $"{blobContainerClient.Uri}/{filename}";
+                uploadUrl = $"{blobContainerClient.Uri}/{id}.png";
 
             } catch (Exception ex){
 
