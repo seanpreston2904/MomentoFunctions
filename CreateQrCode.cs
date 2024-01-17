@@ -29,7 +29,7 @@ namespace Momento.CreateQrCode
         }
 
         [Function("CreateQrCode")]
-        public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
+        public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
         {
 
             _logger.LogInformation("CreateQrCode request received.");
