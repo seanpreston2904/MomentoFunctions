@@ -3,7 +3,7 @@ namespace Momento
     public interface IPhotoStorageService
     {
         
-        List<string> UploadPhotos(Stream requestData, string guid);
+        List<string> UploadPhotosWithGUID(Stream requestData, string location, string container);
 
     }
     

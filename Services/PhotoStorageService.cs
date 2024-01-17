@@ -21,15 +21,17 @@ namespace Momento
         private static BlobServiceClient blobServiceClient = 
             new BlobServiceClient(new Uri(_blobUri), qrCodeStorageKeyCredential);
 
-        private static BlobContainerClient blobContainerClient = 
-            blobServiceClient.GetBlobContainerClient("photodata");
 
-
-        public List<string> UploadPhotos(Stream requestData, string guid)
+        public List<string> UploadPhotosWithGUID(Stream requestData, string location, string container)
         {
 
+            // Parse multipart form data
             var parser = MultipartFormDataParser.Parse(requestData);
             List<string> uploadUrls = new List<string>();
+
+            // Get container client from passed 
+            BlobContainerClient blobContainerClient = 
+                blobServiceClient.GetBlobContainerClient(container);
 
             // Upload files to container
             foreach(var file in parser.Files)
@@ -51,8 +53,8 @@ namespace Momento
                 string id = Guid.NewGuid().ToString();
                 string fileType = file.ContentType[(file.ContentType.LastIndexOf("/") + 1)..];
 
-                blobContainerClient.UploadBlob($"{guid}/{id}.{fileType}", BinaryData.FromBytes(photoBuffer));
-                uploadUrls.Add($"{blobContainerClient.Uri}/{guid}/{id}.{fileType}");
+                blobContainerClient.UploadBlob($"{location}/{id}.{fileType}", BinaryData.FromBytes(photoBuffer));
+                uploadUrls.Add($"{blobContainerClient.Uri}/{location}/{id}.{fileType}");
 
             }
 
